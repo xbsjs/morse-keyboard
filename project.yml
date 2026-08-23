@@ -1,0 +1,56 @@
+name: demo2
+options:
+  bundleIdPrefix: io.morse
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+
+targets:
+  Demo2:
+    type: application
+    platform: iOS
+    sources:
+      - demo2
+    dependencies:
+      - target: Demo2Keyboard
+    info:
+      path: demo2/Info.plist
+      properties:
+        CFBundleDisplayName: 摩斯输入法
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.morse.demo2
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.9"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        DEVELOPMENT_TEAM: 34XL9KG5VF
+        CODE_SIGN_STYLE: Automatic
+
+  Demo2Keyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Demo2Keyboard
+    info:
+      path: Demo2Keyboard/Info.plist
+      properties:
+        CFBundleDisplayName: 摩斯键盘
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            PrimaryLanguage: en
+            IsASCIICapable: true
+            PrefersRightToLeft: false
+            RequestsOpenAccess: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.morse.demo2.keyboard
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.9"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        DEVELOPMENT_TEAM: 34XL9KG5VF
+        CODE_SIGN_STYLE: Automatic
