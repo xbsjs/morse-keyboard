@@ -115,17 +115,6 @@ class KeyboardViewController: UIInputViewController {
     private var cursorAnchor: CGPoint = .zero
     private var cursorApplied = 0
     private var refKey: UIButton!
-    private var mainStack: UIStackView!
-    private var keyboardSubviews: [UIView] = []
-    private var translateSubviews: [UIView] = []
-    private var srcLabel: UILabel?
-    private var resultLabel: UILabel?
-
-    private lazy var reverseMorse: [String: Character] = {
-        var r: [String: Character] = [:]
-        for (k, v) in Morse.table { r[v] = k }
-        return r
-    }()
 
     private let normalColor = UIColor(red: 0.29, green: 0.30, blue: 0.33, alpha: 1)
     private let specialColor = UIColor(red: 0.17, green: 0.18, blue: 0.20, alpha: 1)
@@ -159,7 +148,7 @@ class KeyboardViewController: UIInputViewController {
         widthRules.append(del.widthAnchor.constraint(equalTo: refKey.widthAnchor))
         let row2 = makeRow(row2Keys + [del], spacing: 6)
 
-        let trans = makeIconButton(systemName: "magnifyingglass", background: normalColor, action: #selector(translateTapped))
+        let trans = makeIconButton(systemName: "list.bullet", background: normalColor, action: #selector(showCodeTable))
 
         let row3Keys = [("z", nil as Character?), ("x", nil), ("c", nil),
                         ("v", "/"), ("b", ","), ("n", "."), ("m", "?")]
@@ -180,8 +169,6 @@ class KeyboardViewController: UIInputViewController {
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
-        mainStack = stack
-        keyboardSubviews = [toolbar, row1, row2, row3]
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
@@ -192,63 +179,6 @@ class KeyboardViewController: UIInputViewController {
         widthRules.append(trans.widthAnchor.constraint(equalTo: stack.widthAnchor, multiplier: 0.15, constant: -5.1))
         widthRules.append(ret.widthAnchor.constraint(equalTo: stack.widthAnchor, multiplier: 0.15, constant: -5.1))
         NSLayoutConstraint.activate(widthRules)
-
-        buildTranslateContent()
-    }
-
-    private func buildTranslateContent() {
-        let titleLabel = UILabel()
-        titleLabel.text = "摩斯译码"
-        titleLabel.font = .systemFont(ofSize: 16, weight: .bold)
-        titleLabel.textColor = UIColor(white: 0.85, alpha: 1)
-        titleLabel.textAlignment = .center
-
-        let srcTitle = UILabel()
-        srcTitle.text = "源码"
-        srcTitle.font = .systemFont(ofSize: 12, weight: .medium)
-        srcTitle.textColor = UIColor(white: 0.6, alpha: 1)
-
-        let sl = UILabel()
-        sl.font = .monospacedSystemFont(ofSize: 15, weight: .medium)
-        sl.textColor = .white
-        sl.numberOfLines = 0
-        sl.textAlignment = .center
-        sl.text = ""
-
-        let resTitle = UILabel()
-        resTitle.text = "译文"
-        resTitle.font = .systemFont(ofSize: 12, weight: .medium)
-        resTitle.textColor = UIColor(white: 0.6, alpha: 1)
-
-        let rl = UILabel()
-        rl.font = .systemFont(ofSize: 22, weight: .semibold)
-        rl.textColor = accentColor
-        rl.numberOfLines = 0
-        rl.textAlignment = .center
-        rl.text = ""
-
-        let copyBtn = makeIconButton(systemName: "doc.on.doc", background: accentColor, action: #selector(copyResult))
-        copyBtn.heightAnchor.constraint(equalToConstant: 40).isActive = true
-
-        let magnifierBtn = makeIconButton(systemName: "magnifyingglass", background: normalColor, action: #selector(backToKeyboard))
-        magnifierBtn.heightAnchor.constraint(equalToConstant: 40).isActive = true
-
-        let codeBtn = makeIconButton(systemName: "list.bullet", background: normalColor, action: #selector(showCodeTable))
-        codeBtn.heightAnchor.constraint(equalToConstant: 40).isActive = true
-
-        let btnRow = UIStackView(arrangedSubviews: [magnifierBtn, copyBtn, codeBtn])
-        btnRow.axis = .horizontal
-        btnRow.spacing = 10
-        btnRow.distribution = .fillEqually
-
-        let card = makeRow([titleLabel, srcTitle, sl, resTitle, rl, btnRow], spacing: 8)
-        card.axis = .vertical
-        card.layoutMargins = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
-        card.isLayoutMarginsRelativeArrangement = true
-
-        translateSubviews = [card]
-        srcLabel = sl
-        resultLabel = rl
     }
 
     private func makeToolbar() -> UIStackView {
@@ -352,36 +282,6 @@ class KeyboardViewController: UIInputViewController {
         insert("\n")
     }
 
-    private func decodeMorseText(_ text: String) -> String {
-        var out = ""
-        for token in text.split(separator: " ", omittingEmptySubsequences: true) {
-            let t = String(token)
-            if t == "/" {
-                out.append(" ")
-                continue
-            }
-            if isMorseToken(t) {
-                if let ch = reverseMorse[t] {
-                    out.append(ch)
-                } else {
-                    out.append("?")
-                }
-                continue
-            }
-            out.append(t)
-            out.append(" ")
-        }
-        return out.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func isMorseToken(_ t: String) -> Bool {
-        guard !t.isEmpty else { return false }
-        for c in t {
-            if c != "." && c != "-" && c != "/" { return false }
-        }
-        return true
-    }
-
     @objc private func deletePressed(_ g: UILongPressGestureRecognizer) {
         switch g.state {
         case .began:
@@ -465,72 +365,32 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - 翻译页面
 
-    @objc private func translateTapped() {
-        guard let sl = srcLabel, let rl = resultLabel else { return }
-        var source = ""
-        if let sel = textDocumentProxy.selectedText, !sel.isEmpty {
-            source = sel
-        } else if let clip = UIPasteboard.general.string, !clip.isEmpty {
-            source = clip
-        }
-        sl.text = source.isEmpty ? "无摩斯码" : source
-        rl.text = source.isEmpty ? "" : decodeMorseText(source)
-        mainStack.arrangedSubviews.forEach { $0.isHidden = true }
-        mainStack.addArrangedSubviews(translateSubviews)
-    }
-
-    @objc private func backToKeyboard() {
-        translateSubviews.forEach { $0.removeFromSuperview() }
-        keyboardSubviews.forEach {
-            $0.isHidden = false
-            mainStack.addArrangedSubview($0)
-        }
-    }
-
-    @objc private func copyResult() {
-        guard let text = resultLabel?.text, !text.isEmpty else { return }
-        UIPasteboard.general.string = text
-        statusLabel.text = "已复制译文"
-    }
-
     @objc private func showCodeTable() {
-        var lines: [String] = []
+        var sections: [String] = []
 
-        lines.append("━━━ 字母 ━━━")
+        var letters: [String] = []
         for ch in "abcdefghijklmnopqrstuvwxyz" {
             if let code = Morse.table[ch] {
-                lines.append("\(ch.uppercased())     \(code)")
+                letters.append("\(ch.uppercased()) \(code)")
             }
         }
+        sections.append(letters.joined(separator: " · "))
 
-        lines.append("")
-        lines.append("━━━ 数字 ━━━")
+        var nums: [String] = []
         for ch in "0123456789" {
             if let code = Morse.table[ch] {
-                lines.append(" \(ch)     \(code)")
+                nums.append("\(ch) \(code)")
             }
         }
+        sections.append(nums.joined(separator: " · "))
 
-        lines.append("")
-        lines.append("━━━ 符号 ━━━")
+        var syms: [String] = []
         for (ch, code) in Morse.table.sorted(by: { $0.key < $1.key }) {
             if ch.isLetter || ch.isNumber { continue }
-            lines.append("\(ch)     \(code)")
+            syms.append("\(ch) \(code)")
         }
+        sections.append(syms.joined(separator: " · "))
 
-        srcLabel?.text = "码表  40 字符"
-        srcLabel?.font = .systemFont(ofSize: 12, weight: .medium)
-        srcLabel?.textColor = UIColor(white: 0.6, alpha: 1)
-        srcLabel?.textAlignment = .center
-        resultLabel?.text = lines.joined(separator: "\n")
-        resultLabel?.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        resultLabel?.textColor = .white
-        resultLabel?.textAlignment = .left
-    }
-}
-
-private extension UIStackView {
-    func addArrangedSubviews(_ views: [UIView]) {
-        for v in views { addArrangedSubview(v) }
+        statusLabel.text = "字母  " + sections[0] + "  │  数字  " + sections[1] + "  │  符号  " + sections[2]
     }
 }
