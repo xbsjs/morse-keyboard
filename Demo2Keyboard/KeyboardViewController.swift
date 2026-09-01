@@ -172,11 +172,13 @@ class KeyboardViewController: UIInputViewController {
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
+        let bottomPin = stack.bottomAnchor.constraint(equalTo: view.layoutMarginsGuide.bottomAnchor, constant: -14)
+        bottomPin.priority = UILayoutPriority(750)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
-            stack.bottomAnchor.constraint(equalTo: view.layoutMarginsGuide.bottomAnchor, constant: -4)
+            bottomPin
         ])
         widthRules.append(refKey.widthAnchor.constraint(equalTo: stack.widthAnchor, multiplier: 0.1, constant: -5.4))
         widthRules.append(trans.widthAnchor.constraint(equalTo: stack.widthAnchor, multiplier: 0.15, constant: -5.1))
@@ -191,7 +193,9 @@ class KeyboardViewController: UIInputViewController {
         statusLabel.text = ""
         statusLabel.adjustsFontSizeToFitWidth = true
         statusLabel.minimumScaleFactor = 0.5
-        return makeRow([statusLabel], spacing: 0)
+        let tb = makeRow([statusLabel], spacing: 0)
+        tb.heightAnchor.constraint(greaterThanOrEqualToConstant: 18).isActive = true
+        return tb
     }
 
     private func makeRow(_ views: [UIView], spacing: CGFloat) -> UIStackView {
@@ -245,7 +249,7 @@ class KeyboardViewController: UIInputViewController {
         b.titleLabel?.adjustsFontSizeToFitWidth = true
         b.backgroundColor = background
         b.layer.cornerRadius = 6
-        b.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        b.heightAnchor.constraint(equalToConstant: 47).isActive = true
         b.addTarget(self, action: action, for: .touchUpInside)
         return b
     }
@@ -258,7 +262,7 @@ class KeyboardViewController: UIInputViewController {
         b.tintColor = .white
         b.backgroundColor = background
         b.layer.cornerRadius = 6
-        b.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        b.heightAnchor.constraint(equalToConstant: 47).isActive = true
         b.addTarget(self, action: action, for: .touchUpInside)
         return b
     }
