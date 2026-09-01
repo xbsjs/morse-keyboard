@@ -115,6 +115,9 @@ class KeyboardViewController: UIInputViewController {
     private var cursorAnchor: CGPoint = .zero
     private var cursorApplied = 0
     private var refKey: UIButton!
+    private var codeTablePage: UIView?
+    private var keyboardHeightConstraint: NSLayoutConstraint?
+    private var defaultKeyboardHeight: CGFloat = 0
 
     private let normalColor = UIColor(red: 0.29, green: 0.30, blue: 0.33, alpha: 1)
     private let specialColor = UIColor(red: 0.17, green: 0.18, blue: 0.20, alpha: 1)
@@ -363,34 +366,168 @@ class KeyboardViewController: UIInputViewController {
         insertionHistory.append(text)
     }
 
-    // MARK: - 翻译页面
+    // MARK: - 码表页（全屏）
 
     @objc private func showCodeTable() {
-        var sections: [String] = []
-
-        var letters: [String] = []
-        for ch in "abcdefghijklmnopqrstuvwxyz" {
-            if let code = Morse.table[ch] {
-                letters.append("\(ch.uppercased()) \(code)")
-            }
+        if let page = codeTablePage {
+            closeCodeTable()
+            return
         }
-        sections.append(letters.joined(separator: " · "))
+        expandKeyboard()
+        let page = makeCodeTablePage()
+        view.addSubview(page)
+        codeTablePage = page
+        NSLayoutConstraint.activate([
+            page.topAnchor.constraint(equalTo: view.topAnchor),
+            page.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            page.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            page.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+    }
 
-        var nums: [String] = []
-        for ch in "0123456789" {
-            if let code = Morse.table[ch] {
-                nums.append("\(ch) \(code)")
-            }
+    private func expandKeyboard() {
+        if defaultKeyboardHeight == 0 {
+            defaultKeyboardHeight = view.bounds.height
         }
-        sections.append(nums.joined(separator: " · "))
+        guard defaultKeyboardHeight > 0 else { return }
+        setKeyboardHeight(UIScreen.main.bounds.height)
+    }
+
+    private func setKeyboardHeight(_ h: CGFloat) {
+        if let c = keyboardHeightConstraint {
+            c.constant = h
+        } else {
+            let c = view.heightAnchor.constraint(equalToConstant: h)
+            c.priority = .defaultHigh
+            c.isActive = true
+            keyboardHeightConstraint = c
+        }
+        UIView.animate(withDuration: 0.2, animations: {
+            self.view.layoutIfNeeded()
+        })
+    }
+
+    private func makeCodeTablePage() -> UIView {
+        let page = UIView()
+        page.backgroundColor = UIColor(white: 0, alpha: 0.55)
+        page.isUserInteractionEnabled = true
+        page.translatesAutoresizingMaskIntoConstraints = false
+
+        let card = UIView()
+        card.backgroundColor = UIColor(white: 0.14, alpha: 0.92)
+        card.layer.cornerRadius = 16
+        card.layer.borderColor = UIColor(white: 1, alpha: 0.22).cgColor
+        card.layer.borderWidth = 1
+        card.translatesAutoresizingMaskIntoConstraints = false
+        page.addSubview(card)
+
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 8
+        stack.alignment = .fill
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(stack)
+
+        func makeCell(_ item: String) -> UILabel {
+            let l = UILabel()
+            l.text = item
+            l.font = .monospacedSystemFont(ofSize: 16, weight: .medium)
+            l.textColor = .white
+            l.textAlignment = .left
+            l.translatesAutoresizingMaskIntoConstraints = false
+            return l
+        }
+
+        func makeRow(_ items: [String]) -> UIStackView {
+            var cells = items.map(makeCell)
+            while cells.count < 3 { cells.append(makeCell("")) }
+            let row = UIStackView(arrangedSubviews: cells)
+            row.axis = .horizontal
+            row.distribution = .fillEqually
+            row.spacing = 8
+            return row
+        }
+
+        func makeDivider() -> UIView {
+            let d = UIView()
+            d.backgroundColor = UIColor(white: 1, alpha: 0.22)
+            d.translatesAutoresizingMaskIntoConstraints = false
+            d.heightAnchor.constraint(equalToConstant: 1).isActive = true
+            return d
+        }
+
+        let letters = (0..<26).compactMap { i -> String? in
+            let ch = Character(UnicodeScalar(97 + i)!)
+            guard let code = Morse.table[ch] else { return nil }
+            return "\(ch.uppercased())  \(paddedMorse(code))"
+        }
+        for row in chunk(letters, perLine: 3) {
+            stack.addArrangedSubview(makeRow(row))
+        }
+
+        stack.addArrangedSubview(makeDivider())
+
+        let nums = (0...9).compactMap { i -> String? in
+            let ch = Character(UnicodeScalar(48 + i)!)
+            guard let code = Morse.table[ch] else { return nil }
+            return "\(ch)  \(paddedMorse(code))"
+        }
+        for row in chunk(nums, perLine: 3) {
+            stack.addArrangedSubview(makeRow(row))
+        }
+
+        stack.addArrangedSubview(makeDivider())
 
         var syms: [String] = []
         for (ch, code) in Morse.table.sorted(by: { $0.key < $1.key }) {
             if ch.isLetter || ch.isNumber { continue }
-            syms.append("\(ch) \(code)")
+            syms.append("\(ch)  \(paddedMorse(code))")
         }
-        sections.append(syms.joined(separator: " · "))
+        for row in chunk(syms, perLine: 3) {
+            stack.addArrangedSubview(makeRow(row))
+        }
 
-        statusLabel.text = "字母  " + sections[0] + "  │  数字  " + sections[1] + "  │  符号  " + sections[2]
+        let tap = UITapGestureRecognizer(target: self, action: #selector(closeCodeTable))
+        page.addGestureRecognizer(tap)
+
+        NSLayoutConstraint.activate([
+            card.centerXAnchor.constraint(equalTo: page.centerXAnchor),
+            card.centerYAnchor.constraint(equalTo: page.centerYAnchor),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: page.leadingAnchor, constant: 26),
+            card.trailingAnchor.constraint(lessThanOrEqualTo: page.trailingAnchor, constant: -26),
+
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16)
+        ])
+        return page
+    }
+
+    private func paddedMorse(_ code: String) -> String {
+        return code.padding(toLength: 6, withPad: " ", startingAt: 0)
+    }
+
+    private func chunk(_ items: [String], perLine: Int) -> [[String]] {
+        var result: [[String]] = []
+        var line: [String] = []
+        for item in items {
+            line.append(item)
+            if line.count == perLine {
+                result.append(line)
+                line = []
+            }
+        }
+        if !line.isEmpty { result.append(line) }
+        return result
+    }
+
+    @objc private func closeCodeTable() {
+        guard let page = codeTablePage else { return }
+        codeTablePage = nil
+        page.removeFromSuperview()
+        if defaultKeyboardHeight > 0 {
+            setKeyboardHeight(defaultKeyboardHeight)
+        }
     }
 }
